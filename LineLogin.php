@@ -1,4 +1,5 @@
 <?php
+include_once 'db_connect.php';
 class LineLogin
 {
     #### change your id
@@ -14,48 +15,45 @@ class LineLogin
 
     private function saveUser($profile)
     {
-        // เชื่อมต่อฐานข้อมูล
-        $conn = new mysqli('localhost', 'root', '', 'line_db');
+        global $conn;
     
-        if ($conn->connect_error) {
-            die("Connection failed: " . $conn->connect_error);
-        }
-    
-        // Debug $profile
         if (empty($profile->email)) {
             die('Email is required but not provided in profile.');
         }        
     
-        // ตรวจสอบว่าผู้ใช้อยู่ในฐานข้อมูลแล้วหรือยัง
-        $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
-        if (!$stmt) {
-            die("Prepare failed: " . $conn->error);
+        // ตรวจสอบว่า profile->role มีค่าหรือไม่
+        if (empty($profile->role)) {
+            $profile->role = 'user'; // กำหนดค่า default ให้เป็น 'user'
         }
     
-        $stmt->bind_param("s", $profile->email);
+        // ตรวจสอบว่าผู้ใช้อยู่ในฐานข้อมูลแล้วหรือยัง
+        $stmt = $conn->prepare("SELECT id FROM users WHERE email = :email");
+        $stmt->bindParam(':email', $profile->email);
         $stmt->execute();
-        $stmt->store_result();
     
-        if ($stmt->num_rows > 0) {
+        if ($stmt->rowCount() > 0) {
             // อัปเดตข้อมูลผู้ใช้
-            $stmt = $conn->prepare("UPDATE users SET name = ?, picture = ?, access_token = ?, refresh_token = ? WHERE email = ?");
-            $stmt->bind_param("sssss", $profile->name, $profile->picture, $profile->access_token, $profile->refresh_token, $profile->email);
+            $stmt = $conn->prepare("UPDATE users SET name = :name, picture = :picture, access_token = :access_token, refresh_token = :refresh_token, role = :role WHERE email = :email");
+            $stmt->bindParam(':name', $profile->name);
+            $stmt->bindParam(':picture', $profile->picture);
+            $stmt->bindParam(':access_token', $profile->access_token);
+            $stmt->bindParam(':refresh_token', $profile->refresh_token);
+            $stmt->bindParam(':role', $profile->role);  // ใช้ :role ที่ถูกต้อง
+            $stmt->bindParam(':email', $profile->email);
         } else {
             // เพิ่มผู้ใช้ใหม่
-            $stmt = $conn->prepare("INSERT INTO users (name, email, picture, access_token, refresh_token) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("sssss", $profile->name, $profile->email, $profile->picture, $profile->access_token, $profile->refresh_token);
+            $stmt = $conn->prepare("INSERT INTO users (name, email, picture, access_token, refresh_token, role) VALUES (:name, :email, :picture, :access_token, :refresh_token, :role)");
+            $stmt->bindParam(':name', $profile->name);
+            $stmt->bindParam(':email', $profile->email);
+            $stmt->bindParam(':picture', $profile->picture);
+            $stmt->bindParam(':access_token', $profile->access_token);
+            $stmt->bindParam(':refresh_token', $profile->refresh_token);
+            $stmt->bindParam(':role', $profile->role);  // ใช้ :role ที่ถูกต้อง
         }
     
-        if (!$stmt->execute()) {
-            die("Error executing query: " . $stmt->error);
-        }
+        $stmt->execute();
+    }    
     
-        $stmt->close();
-        $conn->close();
-    }
-    
-
-
     function getLink()
     {
         if (session_status() == PHP_SESSION_NONE) {
